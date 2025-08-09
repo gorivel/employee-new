@@ -7,11 +7,25 @@ const Stats = () => {
   const [actualData, setActualData] = useState([]);
   const [metaData, setMetaData] = useState({});
   const [validUsers, setValidUsers] = useState(0);
+  const [duplicateCount, setDuplicateCount] = useState(0);
 
-  const fetchActualData = async (uids) => {
+  const fetchActualDataUsingEmpid = async (empids) => {
     const { data, error } = await supabase
       .from('employees')
-      .select('empid, empname, classification, division, department, site, directorate, uid, grouping')
+      .select('empid, empname, classification, division, department, site, directorate, uid, grouping, empid_text')
+      .in('empid_text', empids);
+
+    if (error) {
+      console.error('Error fetching data:', error);
+      return [];
+    }
+    return data;
+  };
+
+  const fetchActualDataUsingUid = async (uids) => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('empid, empname, classification, division, department, site, directorate, uid, grouping, empid_text')
       .in('uid', uids);
 
     if (error) {
@@ -111,36 +125,58 @@ const Stats = () => {
     });
 
     setParsedData(data);
+    const empids = data.map((row) => row['Player']).filter((id) => id !== 'N/A');
+    const uids = data.map((row) => row['Player']).filter((id) => id !== 'N/A');
 
-    const uids = data.map((row) => row['Player']).filter((uid) => uid !== 'N/A');
 
-    const actualDataFromSupabase = await fetchActualData(uids);
-    setActualData(actualDataFromSupabase);
+    //find data using empid
+    const actualDataFromSupabase = await fetchActualDataUsingEmpid(empids);
+    //find data using uid
+    const actualDataFromSupabaseUid = await fetchActualDataUsingUid(uids);
+    const uidSet = new Set(actualDataFromSupabaseUid.map(obj => String(obj.uid)));
+    const matchCount = actualDataFromSupabase.reduce((count, obj) => {
+      return count + (uidSet.has(String(obj.empid)) ? 1 : 0);
+    }, 0);
+    setDuplicateCount(matchCount);
+
+    const mergedData = [...actualDataFromSupabase];
+    actualDataFromSupabaseUid.forEach(obj2 => {
+      // Add new object
+    mergedData.push(obj2);
+    });  
+    setActualData(mergedData);
 
     // Calculate valid users count
-    const validCount = actualDataFromSupabase.filter(
+    const count = mergedData.filter(
       (row) => row.uid !== 'N/A' && row.empid !== 'N/A'
     ).length;
 
+    const validCount = count - matchCount;
     setValidUsers(validCount); // Update the state with the count of valid users
 
     const rankOnePlayer = data[0] || {};
     const rankTwoPlayer = data[1] || {};
     const rankThreePlayer = data[2] || {};
+    
+    const getActualPlayerDetailsUid = (uid) => mergedData.find((row) => row.uid === uid) || null;
+    const getActualPlayerDetails = (id) => mergedData.find((row) => row.empid_text === id) || null;
 
-    const getActualPlayerDetails = (uid) =>
-      actualDataFromSupabase.find((row) => row.uid === uid) || null;
-
-    let winner = getActualPlayerDetails(rankOnePlayer['Player']) || getActualPlayerDetails(rankTwoPlayer['Player']) || getActualPlayerDetails(rankThreePlayer['Player']) || {
-      empid: 'N/A',
-      empname: 'No valid winner found',
-      department: 'N/A',
-      site: 'N/A',
-      directorate: 'N/A',
-      uid: 'N/A',
-    };
-
-    const metaDataResult = generateMetaData(actualDataFromSupabase, winner);
+    let winner =
+      getActualPlayerDetails(rankOnePlayer['Player'])
+      || getActualPlayerDetailsUid(rankOnePlayer['Player'])
+      || getActualPlayerDetails(rankTwoPlayer['Player'])
+      || getActualPlayerDetailsUid(rankTwoPlayer['Player'])
+      || getActualPlayerDetails(rankThreePlayer['Player'])
+      || getActualPlayerDetailsUid(rankThreePlayer['Player'])
+      || {
+        empid: 'N/A',
+        empname: 'No valid winner found',
+        department: 'N/A',
+        site: 'N/A',
+        directorate: 'N/A',
+        uid: 'N/A',
+      };
+    const metaDataResult = generateMetaData(mergedData, winner);
     setMetaData(metaDataResult);
   };
 
@@ -173,6 +209,7 @@ const Stats = () => {
             <p>Total Players: {parsedData.length}</p>
             <p>Valid Users: {validUsers}</p>
             <p>Invalid Users: {parsedData.length - validUsers}</p>
+            <p>Match Empid and Uid : {duplicateCount}</p>
             <br />
             <h4 className="font-semibold">Winner:</h4>
             <p>Employee ID: {metaData.winner.empid}</p>

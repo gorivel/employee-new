@@ -28,12 +28,11 @@ const ExportData = () => {
             let allData = [];
             let hasMore = true;
 
-            // Fetch data in chunks - only records with uid
+            // Fetch data in chunks
             while (hasMore) {
                 const { data, error } = await supabase
                     .from('employees')
                     .select('*')
-                    .not('uid', 'is', null) // Only fetch records with uid
                     .range(page * pageSize, (page + 1) * pageSize - 1)
                     .order('empid', { ascending: true }); // Using empid instead of id
 

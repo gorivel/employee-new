@@ -40,10 +40,13 @@ const EmployeeDatabase = () => {
   useEffect(() => {
     if (session) {
       const fetchEmployees = async () => {
-        const { data, error } = await supabase
-          .from("employees")
-          .select("*")
-          .ilike("uid", `%${searchQuery}%`);
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .or(`empid_text.ilike.%${searchQuery}%,uid.ilike.%${searchQuery}%,empname.ilike.%${searchQuery}%`)
+        .order('empid', { ascending: false });;
+
+
         if (error) {
           console.error("Error fetching employees:", error);
         } else {
@@ -115,11 +118,12 @@ const EmployeeDatabase = () => {
       case "search":
         return (
           <>
+              {/* searchbar */}
             <div className="relative mb-6">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search UID..."
+                placeholder="Search NIK or UID OR NAME..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-3/4 pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -269,12 +273,15 @@ const EmployeeDatabase = () => {
     <div className="min-h-screen bg-gray-50">
       {session ? (
         <>
+          {/* logout */}
           <button
             onClick={handleLogout}
             className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded"
           >
             Log out
           </button>
+
+          {/* sidebar toggle */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow"
@@ -282,6 +289,7 @@ const EmployeeDatabase = () => {
             {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
+          {/* sidebar */}
           <div
             className={`fixed inset-y-0 left-0 transform ${
               isSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -314,6 +322,7 @@ const EmployeeDatabase = () => {
           <div className={`lg:ml-64 p-6`}>{renderContent()}</div>
         </>
       ) : (
+        //login
         <div className="flex justify-center items-center h-screen">
           <form
             onSubmit={handleLogin}
